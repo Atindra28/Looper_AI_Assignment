@@ -4,6 +4,39 @@ A production-quality full-stack Financial Analytics Dashboard built as a technic
 
 ---
 
+## ⚡ Quick Start (for evaluators)
+
+```bash
+# 1. Clone the repo
+git clone https://github.com/Atindra28/Looper_AI_Assignment.git
+cd Looper_AI_Assignment
+
+# 2. Backend setup
+cd backend
+npm install
+cp .env.example .env          # then open .env and set MONGODB_URI
+npm run seed                   # loads 300 transactions + creates demo user
+
+# 3. Start backend  (keep this terminal open)
+npm run dev                    # → http://localhost:5000
+
+# 4. Frontend setup (new terminal)
+cd ../frontend
+npm install
+npm run dev                    # → http://localhost:5173
+
+# 5. Open http://localhost:5173 and log in with:
+#    Email:    admin@penta.com
+#    Password: password123
+```
+
+> **MongoDB**: The app expects MongoDB running locally on port 27017.  
+> If you use MongoDB Atlas, replace `MONGODB_URI` in `backend/.env` with your Atlas connection string.
+
+---
+
+---
+
 ## Features
 
 - **JWT Authentication** — Login / logout, protected routes and APIs
