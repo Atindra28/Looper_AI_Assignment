@@ -1,0 +1,835 @@
+{
+  "info": {
+    "name": "Looper AI — Financial Analytics Dashboard",
+    "description": "Complete API collection for the Looper AI Full-Stack Financial Analytics Dashboard assignment.\n\n**How to use:**\n1. Import this file into Postman.\n2. Set the `baseUrl` collection variable to `http://localhost:5000` (already set).\n3. Run **Auth / Login** first — the test script automatically saves the JWT to `{{authToken}}`.\n4. All protected requests use `{{authToken}}` via Bearer token auth.\n\n**Demo credentials:** admin@penta.com / password123",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "looper-ai-financial-dashboard-v1"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000",
+      "type": "string",
+      "description": "Base URL of the backend server. Change to your deployment URL if needed."
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "type": "string",
+      "description": "JWT token. Automatically populated after running the Login request."
+    },
+    {
+      "key": "sampleTransactionId",
+      "value": "",
+      "type": "string",
+      "description": "A MongoDB ObjectId of a transaction. Populated automatically by the Get All Transactions test script."
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{authToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "description": "Endpoints for JWT login, logout, and current-user retrieval.\n\nRun **Login** first to populate `{{authToken}}` automatically.",
+      "item": [
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@penta.com\",\n  \"password\": \"password123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "**POST /api/auth/login**\n\nAuthenticates a user with email and password. Returns a signed JWT token valid for 24 hours.\n\n**Authentication required:** No\n\n**Request body:**\n- `email` (string, required) — registered user email\n- `password` (string, required) — plain-text password\n\n**Success 200:**\n```json\n{\n  \"success\": true,\n  \"data\": {\n    \"token\": \"eyJhbGci...\",\n    \"user\": {\n      \"_id\": \"...\",\n      \"email\": \"admin@penta.com\",\n      \"name\": \"Admin User\",\n      \"avatarUrl\": \"...\"\n    }\n  }\n}\n```\n\n**Error 401** (wrong credentials):\n```json\n{\n  \"success\": false,\n  \"error\": { \"code\": \"INVALID_CREDENTIALS\", \"message\": \"Invalid email or password\" }\n}\n```\n\nThe test script automatically saves the token to `{{authToken}}`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const body = pm.response.json();",
+                  "    if (body.success && body.data && body.data.token) {",
+                  "        pm.collectionVariables.set('authToken', body.data.token);",
+                  "        console.log('✅ JWT token saved to {{authToken}}');",
+                  "    }",
+                  "} else {",
+                  "    console.log('❌ Login failed:', pm.response.json());",
+                  "}",
+                  "",
+                  "pm.test('Login returns 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response has token', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.success).to.be.true;",
+                  "    pm.expect(body.data.token).to.be.a('string').and.not.be.empty;",
+                  "});",
+                  "pm.test('Response has user object (no password)', () => {",
+                  "    const user = pm.response.json().data.user;",
+                  "    pm.expect(user).to.have.property('email');",
+                  "    pm.expect(user).to.not.have.property('password');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login — Wrong Password (401)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@penta.com\",\n  \"password\": \"wrongpassword\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "**POST /api/auth/login**\n\nDemonstrates the 401 error response when incorrect credentials are provided.\n\n**Expected response 401:**\n```json\n{\n  \"success\": false,\n  \"error\": {\n    \"code\": \"INVALID_CREDENTIALS\",\n    \"message\": \"Invalid email or password\"\n  }\n}\n```"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Wrong password returns 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Error code is INVALID_CREDENTIALS', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.success).to.be.false;",
+                  "    pm.expect(body.error.code).to.eql('INVALID_CREDENTIALS');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Current User (me)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "me"]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{authToken}}", "type": "string" }]
+            },
+            "description": "**GET /api/auth/me**\n\nReturns the profile of the currently authenticated user. The password hash is never included in the response.\n\n**Authentication required:** Yes — Bearer `{{authToken}}`\n\n**Success 200:**\n```json\n{\n  \"success\": true,\n  \"data\": {\n    \"user\": {\n      \"_id\": \"...\",\n      \"email\": \"admin@penta.com\",\n      \"name\": \"Admin User\",\n      \"avatarUrl\": \"...\",\n      \"createdAt\": \"2024-01-01T00:00:00.000Z\"\n    }\n  }\n}\n```\n\n**Error 401** (missing/invalid token):\n```json\n{ \"success\": false, \"error\": { \"code\": \"UNAUTHORIZED\", \"message\": \"No authentication token provided\" } }\n```"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Get me returns 200', () => pm.response.to.have.status(200));",
+                  "pm.test('User has no password field', () => {",
+                  "    const user = pm.response.json().data.user;",
+                  "    pm.expect(user).to.not.have.property('password');",
+                  "    pm.expect(user).to.have.property('email');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "logout"]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{authToken}}", "type": "string" }]
+            },
+            "description": "**POST /api/auth/logout**\n\nLogs out the current user. JWT is stateless, so this endpoint signals the logout server-side while the client discards the token.\n\n**Authentication required:** Yes — Bearer `{{authToken}}`\n\n**Success 200:**\n```json\n{\n  \"success\": true,\n  \"data\": { \"message\": \"Logged out successfully\" }\n}\n```"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Logout returns 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Logout message present', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.success).to.be.true;",
+                  "    pm.expect(body.data.message).to.include('Logged out');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Protected Request — No Token (401)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "me"]
+            },
+            "description": "**GET /api/auth/me** without Authorization header.\n\nDemonstrates the 401 error when no token is provided.\n\n**Expected 401:**\n```json\n{\n  \"success\": false,\n  \"error\": { \"code\": \"UNAUTHORIZED\", \"message\": \"No authentication token provided\" }\n}\n```"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No token returns 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Error code is UNAUTHORIZED', () => {",
+                  "    pm.expect(pm.response.json().error.code).to.eql('UNAUTHORIZED');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "description": "Analytics endpoints that return aggregated financial data calculated live from MongoDB.\n\nAll endpoints require Bearer `{{authToken}}`.",
+      "item": [
+        {
+          "name": "Summary Metrics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/dashboard/summary",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "dashboard", "summary"]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{authToken}}", "type": "string" }]
+            },
+            "description": "**GET /api/dashboard/summary**\n\nReturns aggregated financial summary calculated live from the transactions collection.\n\n**Authentication required:** Yes\n\n**Calculated fields:**\n- `totalRevenue` — sum of all transactions where `category = \"Revenue\"`\n- `totalExpenses` — sum of all transactions where `category = \"Expense\"`\n- `balance` — `totalRevenue − totalExpenses`\n- `savings` — same as balance (net income)\n- `revenueChange` — month-over-month % change in revenue\n- `expensesChange` — month-over-month % change in expenses\n- `balanceChange` — month-over-month % change in balance\n- `savingsChange` — month-over-month % change in savings\n\n**Success 200:**\n```json\n{\n  \"success\": true,\n  \"data\": {\n    \"totalRevenue\": 175432.50,\n    \"totalExpenses\": 121850.75,\n    \"balance\": 53581.75,\n    \"savings\": 53581.75,\n    \"revenueChange\": 12.5,\n    \"expensesChange\": -3.2,\n    \"balanceChange\": 8.1,\n    \"savingsChange\": 8.1\n  }\n}\n```"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Summary returns 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Summary has all required fields', () => {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d).to.have.property('totalRevenue');",
+                  "    pm.expect(d).to.have.property('totalExpenses');",
+                  "    pm.expect(d).to.have.property('balance');",
+                  "    pm.expect(d).to.have.property('savings');",
+                  "    pm.expect(d.totalRevenue).to.be.a('number');",
+                  "    pm.expect(d.totalExpenses).to.be.a('number');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Revenue vs Expense Trends (Monthly)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/dashboard/trends?year=2024",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "dashboard", "trends"],
+              "query": [
+                {
+                  "key": "year",
+                  "value": "2024",
+                  "description": "Calendar year to aggregate. Defaults to the most recent year in the dataset (2024). Integer."
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{authToken}}", "type": "string" }]
+            },
+            "description": "**GET /api/dashboard/trends**\n\nReturns monthly revenue and expense totals for a full calendar year. Always returns 12 data points (one per month), including months with zero transactions.\n\n**Authentication required:** Yes\n\n**Query parameters:**\n- `year` (integer, optional) — defaults to the most recent year in the dataset (2024)\n\n**Success 200:**\n```json\n{\n  \"success\": true,\n  \"data\": [\n    { \"month\": \"Jan\", \"monthNum\": 1, \"year\": 2024, \"revenue\": 18200.00, \"expenses\": 9450.50 },\n    { \"month\": \"Feb\", \"monthNum\": 2, \"year\": 2024, \"revenue\": 14300.00, \"expenses\": 11200.75 },\n    ...\n    { \"month\": \"Dec\", \"monthNum\": 12, \"year\": 2024, \"revenue\": 12100.00, \"expenses\": 8900.00 }\n  ]\n}\n```"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Trends returns 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Trends returns 12 months', () => {",
+                  "    const data = pm.response.json().data;",
+                  "    pm.expect(data).to.be.an('array').with.lengthOf(12);",
+                  "});",
+                  "pm.test('Each month has revenue and expenses', () => {",
+                  "    pm.response.json().data.forEach(m => {",
+                  "        pm.expect(m).to.have.property('month');",
+                  "        pm.expect(m).to.have.property('revenue');",
+                  "        pm.expect(m).to.have.property('expenses');",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Category Breakdown",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/dashboard/categories",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "dashboard", "categories"]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{authToken}}", "type": "string" }]
+            },
+            "description": "**GET /api/dashboard/categories**\n\nReturns Revenue vs Expense breakdown — total amount, record count, and percentage for each category.\n\n**Authentication required:** Yes\n\n**Note:** The dataset contains exactly 2 categories: `\"Revenue\"` and `\"Expense\"`.\n\n**Success 200:**\n```json\n{\n  \"success\": true,\n  \"data\": [\n    { \"category\": \"Revenue\", \"total\": 175432.50, \"count\": 150, \"percentage\": 59.0 },\n    { \"category\": \"Expense\", \"total\": 121850.75, \"count\": 150, \"percentage\": 41.0 }\n  ]\n}\n```"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Categories returns 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Has Revenue and Expense entries', () => {",
+                  "    const data = pm.response.json().data;",
+                  "    pm.expect(data).to.be.an('array');",
+                  "    const cats = data.map(d => d.category);",
+                  "    pm.expect(cats).to.include('Revenue');",
+                  "    pm.expect(cats).to.include('Expense');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Recent Transactions (5 latest)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/dashboard/recent",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "dashboard", "recent"]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{authToken}}", "type": "string" }]
+            },
+            "description": "**GET /api/dashboard/recent**\n\nReturns the 5 most recent transactions sorted by date descending. Used to populate the Recent Transactions panel on the dashboard.\n\n**Authentication required:** Yes\n\n**Success 200:**\n```json\n{\n  \"success\": true,\n  \"data\": [\n    {\n      \"_id\": \"60f7...\",\n      \"id\": 247,\n      \"date\": \"2024-11-29T08:36:15.000Z\",\n      \"amount\": 2700.00,\n      \"category\": \"Revenue\",\n      \"status\": \"Paid\",\n      \"user_id\": \"user_003\",\n      \"user_profile\": \"https://thispersondoesnotexist.com/\",\n      \"userName\": \"Riley Johnson\"\n    }\n  ]\n}\n```"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Recent returns 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Returns at most 5 transactions', () => {",
+                  "    pm.expect(pm.response.json().data.length).to.be.lte(5);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Transactions",
+      "description": "CRUD and export endpoints for transaction records.\n\nAll endpoints require Bearer `{{authToken}}`.\n\n**Dataset facts:**\n- 300 total records\n- `amount` is always positive; direction is determined by `category`\n- `category` values: `Revenue`, `Expense`\n- `status` values: `Paid`, `Pending`\n- `user_id` values: `user_001`, `user_002`, `user_003`, `user_004`\n- Date range: January 2024 – December 2024",
+      "item": [
+        {
+          "name": "Get All Transactions (default)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/transactions?page=1&limit=10&sortField=date&sortDir=desc",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "transactions"],
+              "query": [
+                { "key": "page", "value": "1", "description": "Page number (1-based, default: 1)" },
+                { "key": "limit", "value": "10", "description": "Records per page (default: 10, max: 100)" },
+                { "key": "sortField", "value": "date", "description": "Sort field: date | amount | category | status | user_id | id" },
+                { "key": "sortDir", "value": "desc", "description": "Sort direction: asc | desc" }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{authToken}}", "type": "string" }]
+            },
+            "description": "**GET /api/transactions**\n\nReturns a paginated list of transactions. Supports search, filtering, sorting, and pagination via query parameters.\n\n**Authentication required:** Yes\n\n**All query parameters:**\n\n| Parameter | Type | Default | Description |\n|-----------|------|---------|-------------|\n| `search` | string | — | Searches user_id, category, status, numeric id, amount, and date (YYYY-MM-DD) |\n| `dateFrom` | ISO date | — | Start of date range (inclusive) |\n| `dateTo` | ISO date | — | End of date range (inclusive, set to end of day) |\n| `amountMin` | number | — | Minimum transaction amount |\n| `amountMax` | number | — | Maximum transaction amount |\n| `category` | Revenue\\|Expense | — | Filter by category |\n| `status` | Paid\\|Pending | — | Filter by status |\n| `user_id` | string | — | Filter by user: user_001–user_004 |\n| `sortField` | string | date | date, amount, category, status, user_id, id |\n| `sortDir` | asc\\|desc | desc | Sort direction |\n| `page` | integer | 1 | Page number (1-based) |\n| `limit` | integer | 10 | Records per page (max 100) |\n\n**Success 200:**\n```json\n{\n  \"success\": true,\n  \"data\": [ { \"_id\": \"...\", \"id\": 247, \"date\": \"...\", \"amount\": 2700, ... } ],\n  \"pagination\": { \"page\": 1, \"limit\": 10, \"total\": 300, \"totalPages\": 30 }\n}\n```"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Transactions returns 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response has pagination meta', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.pagination).to.have.property('total');",
+                  "    pm.expect(body.pagination).to.have.property('totalPages');",
+                  "    pm.expect(body.pagination.total).to.be.above(0);",
+                  "});",
+                  "// Save first transaction _id for use in 'Get Transaction by ID'",
+                  "const data = pm.response.json().data;",
+                  "if (data && data.length > 0) {",
+                  "    pm.collectionVariables.set('sampleTransactionId', data[0]._id);",
+                  "    console.log('Saved sampleTransactionId:', data[0]._id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Search Transactions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/transactions?search=Revenue&page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "transactions"],
+              "query": [
+                { "key": "search", "value": "Revenue", "description": "Text search across user_id, category, status, numeric id, amount, and date" },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{authToken}}", "type": "string" }]
+            },
+            "description": "**GET /api/transactions?search=Revenue**\n\nReal-time search across transaction fields. The `search` parameter matches against:\n- `user_id` (regex, case-insensitive)\n- `category` (regex, case-insensitive)\n- `status` (regex, case-insensitive)\n- `id` (exact numeric match)\n- `amount` (exact numeric match)\n- `date` (formatted as YYYY-MM-DD, e.g. search `\"2024-01\"` matches all January 2024 records)\n\n**Try these search values:**\n- `\"Revenue\"` — all revenue transactions\n- `\"Paid\"` — all paid transactions\n- `\"user_001\"` — transactions for user_001\n- `\"2024-06\"` — all June 2024 transactions\n- `\"3200\"` — transactions with amount 3200"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Search returns 200', () => pm.response.to.have.status(200));",
+                  "pm.test('All results match search term', () => {",
+                  "    const data = pm.response.json().data;",
+                  "    data.forEach(tx => {",
+                  "        pm.expect(tx.category).to.eql('Revenue');",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Filter by Category",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/transactions?category=Expense&page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "transactions"],
+              "query": [
+                { "key": "category", "value": "Expense", "description": "Revenue | Expense" },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{authToken}}", "type": "string" }]
+            },
+            "description": "**GET /api/transactions?category=Expense**\n\nFilters transactions to a specific category.\n\n**Allowed values:** `Revenue`, `Expense`"
+          }
+        },
+        {
+          "name": "Filter by Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/transactions?status=Pending&page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "transactions"],
+              "query": [
+                { "key": "status", "value": "Pending", "description": "Paid | Pending" },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{authToken}}", "type": "string" }]
+            },
+            "description": "**GET /api/transactions?status=Pending**\n\nFilters transactions by status.\n\n**Allowed values:** `Paid`, `Pending`"
+          }
+        },
+        {
+          "name": "Filter by Date Range",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/transactions?dateFrom=2024-01-01&dateTo=2024-03-31&page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "transactions"],
+              "query": [
+                { "key": "dateFrom", "value": "2024-01-01", "description": "Start date (YYYY-MM-DD), inclusive" },
+                { "key": "dateTo", "value": "2024-03-31", "description": "End date (YYYY-MM-DD), inclusive (set to end of day)" },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{authToken}}", "type": "string" }]
+            },
+            "description": "**GET /api/transactions?dateFrom=2024-01-01&dateTo=2024-03-31**\n\nFilters transactions to a date range. `dateTo` is automatically extended to 23:59:59 of that day so the full day is included."
+          }
+        },
+        {
+          "name": "Filter by Amount Range",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/transactions?amountMin=1000&amountMax=3000&page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "transactions"],
+              "query": [
+                { "key": "amountMin", "value": "1000", "description": "Minimum amount (inclusive, in dataset range: 150–5000)" },
+                { "key": "amountMax", "value": "3000", "description": "Maximum amount (inclusive)" },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{authToken}}", "type": "string" }]
+            },
+            "description": "**GET /api/transactions?amountMin=1000&amountMax=3000**\n\nFilters transactions where `amount` is between `amountMin` and `amountMax` (both inclusive).\n\n**Note:** Amounts in the dataset are always positive (150–5000). The display sign (+ / −) is derived from `category` on the frontend."
+          }
+        },
+        {
+          "name": "Filter by User",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/transactions?user_id=user_001&page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "transactions"],
+              "query": [
+                { "key": "user_id", "value": "user_001", "description": "user_001 (Alex Morgan) | user_002 (Jamie Chen) | user_003 (Riley Johnson) | user_004 (Sam Williams)" },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{authToken}}", "type": "string" }]
+            },
+            "description": "**GET /api/transactions?user_id=user_001**\n\nFilters transactions to a specific user.\n\n**User ID to display name mapping:**\n- `user_001` → Alex Morgan\n- `user_002` → Jamie Chen\n- `user_003` → Riley Johnson\n- `user_004` → Sam Williams"
+          }
+        },
+        {
+          "name": "Multi-Field Filter (Combined)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/transactions?category=Revenue&status=Paid&dateFrom=2024-06-01&dateTo=2024-12-31&amountMin=1500&sortField=amount&sortDir=desc&page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "transactions"],
+              "query": [
+                { "key": "category", "value": "Revenue" },
+                { "key": "status", "value": "Paid" },
+                { "key": "dateFrom", "value": "2024-06-01" },
+                { "key": "dateTo", "value": "2024-12-31" },
+                { "key": "amountMin", "value": "1500" },
+                { "key": "sortField", "value": "amount" },
+                { "key": "sortDir", "value": "desc" },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{authToken}}", "type": "string" }]
+            },
+            "description": "**GET /api/transactions (combined filters)**\n\nDemonstrates combining multiple filter parameters in a single request:\n- category = Revenue\n- status = Paid\n- date range = Jun–Dec 2024\n- amount ≥ 1500\n- sorted by amount descending\n\nAll filter parameters are combined with AND logic in the MongoDB query."
+          }
+        },
+        {
+          "name": "Sort by Amount (Ascending)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/transactions?sortField=amount&sortDir=asc&page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "transactions"],
+              "query": [
+                { "key": "sortField", "value": "amount", "description": "Allowed: date | amount | category | status | user_id | id" },
+                { "key": "sortDir", "value": "asc" },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{authToken}}", "type": "string" }]
+            },
+            "description": "**GET /api/transactions?sortField=amount&sortDir=asc**\n\nSorts transactions by amount ascending (smallest first).\n\n**Sortable fields:** `date`, `amount`, `category`, `status`, `user_id`, `id`\n**Sort directions:** `asc`, `desc`"
+          }
+        },
+        {
+          "name": "Pagination — Page 2",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/transactions?page=2&limit=25",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "transactions"],
+              "query": [
+                { "key": "page", "value": "2", "description": "Page number (1-based)" },
+                { "key": "limit", "value": "25", "description": "Records per page (max: 100)" }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{authToken}}", "type": "string" }]
+            },
+            "description": "**GET /api/transactions?page=2&limit=25**\n\nDemonstrates server-side pagination. Returns records 26–50.\n\nThe response includes a `pagination` object:\n```json\n{ \"page\": 2, \"limit\": 25, \"total\": 300, \"totalPages\": 12 }\n```"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Page 2 returns 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Pagination page is 2', () => {",
+                  "    pm.expect(pm.response.json().pagination.page).to.eql(2);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Transaction by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/transactions/{{sampleTransactionId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "transactions", "{{sampleTransactionId}}"]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{authToken}}", "type": "string" }]
+            },
+            "description": "**GET /api/transactions/:id**\n\nReturns a single transaction by its MongoDB ObjectId.\n\n**Authentication required:** Yes\n\n**URL parameter:**\n- `:id` — MongoDB ObjectId (24-char hex string). Use `{{sampleTransactionId}}` which is auto-populated by the *Get All Transactions* test script, or replace with a real `_id` from the database.\n\n**Success 200:**\n```json\n{\n  \"success\": true,\n  \"data\": {\n    \"_id\": \"60f7...\",\n    \"id\": 42,\n    \"date\": \"2024-02-21T11:43:30.000Z\",\n    \"amount\": 850.00,\n    \"category\": \"Expense\",\n    \"status\": \"Pending\",\n    \"user_id\": \"user_002\",\n    \"user_profile\": \"https://thispersondoesnotexist.com/\",\n    \"userName\": \"Jamie Chen\"\n  }\n}\n```\n\n**Error 404:**\n```json\n{ \"success\": false, \"error\": { \"code\": \"NOT_FOUND\", \"message\": \"Transaction not found\" } }\n```"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Get by ID returns 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Has all transaction fields', () => {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d).to.have.property('id');",
+                  "    pm.expect(d).to.have.property('date');",
+                  "    pm.expect(d).to.have.property('amount');",
+                  "    pm.expect(d).to.have.property('category');",
+                  "    pm.expect(d).to.have.property('status');",
+                  "    pm.expect(d).to.have.property('user_id');",
+                  "    pm.expect(d).to.have.property('userName');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Export CSV — All Columns",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/transactions/export",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "transactions", "export"]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{authToken}}", "type": "string" }]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fields\": [\"id\", \"date\", \"amount\", \"category\", \"status\", \"userName\", \"user_id\", \"user_profile\"],\n  \"filters\": {}\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "**POST /api/transactions/export**\n\nGenerates and returns a CSV file for all transactions (no filters). The browser receives the file as an attachment download.\n\n**Authentication required:** Yes\n\n**Request body:**\n- `fields` (string[], required) — columns to include. Allowed values: `id`, `date`, `amount`, `category`, `status`, `userName`, `user_id`, `user_profile`\n- `filters` (object, optional) — same filter params as GET /api/transactions. Empty object `{}` = export all 300 records.\n\n**Response:**\n```\nContent-Type: text/csv; charset=utf-8\nContent-Disposition: attachment; filename=\"transactions_export_2024-01-01T00-00-00.csv\"\n\nID,Date,Amount,Category,Status,User Name,User ID,User Profile URL\n1,2024-01-15T08:34:12.000Z,1500,Revenue,Paid,Alex Morgan,user_001,https://...\n...\n```\n\n**Error 400** (no fields selected):\n```json\n{ \"success\": false, \"error\": { \"code\": \"VALIDATION_ERROR\", \"message\": \"At least one field must be selected for export\" } }\n```\n\n**Note:** In Postman, click **Send and Download** to save the CSV file to disk."
+          }
+        },
+        {
+          "name": "Export CSV — Filtered (Revenue only, Paid)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/transactions/export",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "transactions", "export"]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{authToken}}", "type": "string" }]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fields\": [\"date\", \"amount\", \"category\", \"status\", \"userName\"],\n  \"filters\": {\n    \"category\": \"Revenue\",\n    \"status\": \"Paid\"\n  }\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "**POST /api/transactions/export (with filters)**\n\nExports only Revenue + Paid transactions with a subset of columns.\n\nDemonstrates that the `filters` body param respects all the same filter logic as GET /api/transactions (category, status, date range, amount range, user_id, search).\n\n**Note:** Use **Send and Download** in Postman to save the file."
+          }
+        },
+        {
+          "name": "Export CSV — Selected Columns Only",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/transactions/export",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "transactions", "export"]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{authToken}}", "type": "string" }]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fields\": [\"date\", \"amount\", \"category\", \"status\"],\n  \"filters\": {\n    \"dateFrom\": \"2024-01-01\",\n    \"dateTo\": \"2024-06-30\"\n  }\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "**POST /api/transactions/export (minimal columns + date filter)**\n\nExports only 4 columns for H1 2024 transactions. Demonstrates configurable column selection.\n\nThe `fields` array drives which columns appear in the CSV. Column order matches the array order. Human-readable headers are used (e.g. `amount` → `Amount`)."
+          }
+        },
+        {
+          "name": "Export CSV — No Fields Selected (400 error)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/transactions/export",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "transactions", "export"]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{authToken}}", "type": "string" }]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fields\": [],\n  \"filters\": {}\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "**POST /api/transactions/export** with empty `fields` array.\n\nDemonstrates the 400 validation error when no columns are selected.\n\n**Expected 400:**\n```json\n{\n  \"success\": false,\n  \"error\": {\n    \"code\": \"VALIDATION_ERROR\",\n    \"message\": \"At least one field must be selected for export\"\n  }\n}\n```"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Empty fields returns 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Error code is VALIDATION_ERROR', () => {",
+                  "    pm.expect(pm.response.json().error.code).to.eql('VALIDATION_ERROR');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
